@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Counter {
+  id        Int      @id @default(1)
+  value     Int      @default(0)
+  updatedAt DateTime @default(now()) @map("updated_at")
+  lastMessageId String? @map("last_message_id")
+
+  @@map("counter")
+}
