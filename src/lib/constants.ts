@@ -2,7 +2,8 @@
  * Configuración centralizada del tiempo de reseteo por inactividad.
  * Lee de NEXT_PUBLIC_RESET_TIME (ej: "20m", "30s", "1h") con fallback a "20m".
  */
-export const RESET_TIME = process.env.NEXT_PUBLIC_RESET_TIME || "20m";
+export const RESET_TIME =
+  process.env.NEXT_PUBLIC_RESET_TIME || process.env.RESET_TIME || "20m";
 
 /**
  * Convierte un formato de tiempo (ej: "20m", "30s", "1h") a milisegundos para el frontend.

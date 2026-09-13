@@ -8,7 +8,7 @@ export const qstash = new Client({
 
 import { RESET_MS } from "@/lib/constants";
 
-const APP_URL = process.env.APP_URL || "http://127.0.0.1:3000";
+const APP_URL = (process.env.APP_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
 
 /**
  * Cancela el mensaje pendiente anterior (si existe) y programa uno nuevo a 20m.

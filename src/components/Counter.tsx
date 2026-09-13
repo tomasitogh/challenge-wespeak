@@ -21,7 +21,6 @@ export default function Counter({
   const [state, setState] = useState(initial);
   const [now, setNow] = useState(serverNow);
   const [isPending, startTransition] = useTransition();
-  const [isResetting, setIsResetting] = useState(false);
 
   // Actualiza el reloj cada 1 segundo
   useEffect(() => {
@@ -37,38 +36,28 @@ export default function Counter({
   
   const displayValue = state.value;
 
-  // Sincronización limpia cuando el timer llega a 0
+  // Cuando el tiempo llega a 0, consulta al servidor para sincronizar sin bloquear la UI
   useEffect(() => {
     if (remaining === 0 && state.value !== 0) {
-      setIsResetting(true);
-      let isMounted = true;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-      const checkDatabase = async () => {
+      const interval = setInterval(async () => {
+        attempts++;
         try {
           const fresh = await getCounter();
-          if (!isMounted) return;
-
           if (fresh.value === 0) {
             setState({ value: 0, updatedAt: fresh.updatedAt });
-            setIsResetting(false);
-          } else {
-            // Si el webhook aún estaba en vuelo, reintenta en 1s sin spamear
-            setTimeout(checkDatabase, 1000);
+            clearInterval(interval);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(interval);
           }
         } catch {
-          if (isMounted) setTimeout(checkDatabase, 1000);
+          if (attempts >= maxAttempts) clearInterval(interval);
         }
-      };
+      }, 2000);
 
-      // Damos 800ms para permitir que el webhook de QStash impacte primero
-      const timer = setTimeout(checkDatabase, 800);
-
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-      };
-    } else {
-      setIsResetting(false);
+      return () => clearInterval(interval);
     }
   }, [remaining, state.value]);
 
@@ -80,7 +69,8 @@ export default function Counter({
     });
   };
 
-  const isDisabled = isPending || isResetting;
+  // Los botones NUNCA se congelan: solo se deshabilitan durante el guardado de un clic
+  const isDisabled = isPending;
 
   return (
     <div className="w-full max-w-xs rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
@@ -88,7 +78,7 @@ export default function Counter({
         Contador
       </h1>
 
-      <p className={`my-6 text-7xl font-bold tabular-nums text-zinc-900 transition-opacity duration-200 ${isResetting ? "opacity-40" : "opacity-100"}`}>
+      <p className="my-6 text-7xl font-bold tabular-nums text-zinc-900">
         {displayValue}
       </p>
 
@@ -111,18 +101,12 @@ export default function Counter({
         </button>
       </div>
 
-      {/* Estados de feedback al usuario */}
+      {/* Feedback de guardado */}
       {isPending && (
         <p className="mt-4 text-xs text-zinc-400">Guardando…</p>
       )}
 
-      {!isPending && isResetting && (
-        <p className="mt-4 text-xs font-medium text-zinc-500 animate-pulse">
-          Reiniciando contador a 0…
-        </p>
-      )}
-
-      {!isPending && !isResetting && state.value !== 0 && (
+      {!isPending && state.value !== 0 && (
         <p className="mt-4 text-xs text-zinc-400">
           Se reinicia en{" "}
           <span className="font-semibold tabular-nums text-zinc-600">
@@ -131,7 +115,7 @@ export default function Counter({
         </p>
       )}
 
-      {!isPending && !isResetting && state.value === 0 && (
+      {!isPending && state.value === 0 && (
         <p className="mt-4 text-xs text-zinc-400">
           Inactivo (el contador está en 0)
         </p>
