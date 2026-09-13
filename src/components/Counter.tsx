@@ -5,7 +5,7 @@ import { increment, decrement, getCounter } from "@/lib/actions";
 import { RESET_MS } from "@/lib/constants";
 
 function formatTime(ms: number) {
-  const total = Math.max(0, Math.ceil(ms / 1000));
+  const total = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(total / 60).toString().padStart(2, "0");
   const s = (total % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
@@ -28,10 +28,10 @@ export default function Counter({
     return () => clearInterval(timer);
   }, []);
 
-  // Calcula el tiempo restante a partir del último cambio
-  const remaining = Math.max(
-    0,
-    RESET_MS - (now - new Date(state.updatedAt).getTime())
+  // Calcula el tiempo restante con tope máximo en RESET_MS para evitar desfasajes como 20:01
+  const remaining = Math.min(
+    RESET_MS,
+    Math.max(0, RESET_MS - (now - new Date(state.updatedAt).getTime()))
   );
   
   // Si el tiempo llegó a 0, el contador expiró y pasa inmediatamente a 0
