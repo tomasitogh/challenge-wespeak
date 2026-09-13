@@ -59,69 +59,93 @@ Además, mantuve Tailwind ya que en los comandos de incialización de Next.js ya
 
 ---
 
-## Cómo correrlo
+## Cómo correrlo en local
 
-1. Crear un proyecto en [Supabase](https://supabase.com) y copiar la connection string del pooler.
-2. Crear el archivo `.env` (o `.env.local`) en la raíz con la variable:
-
-   ```
-   DATABASE_URL=postgresql://...
-   ```
-
-3. Abrir el **SQL Editor** de Supabase y ejecutar el contenido de [`supabase/schema.sql`](supabase/schema.sql). Esto crea la tabla `counter` y el cron de reset cada 20 minutos en un solo paso.
-4. Instalar dependencias y generar el cliente Prisma:
-
+1. Clonar el repositorio e instalar dependencias:
    ```bash
+   git clone https://github.com/tu-usuario/challenge-wespeak.git
+   cd challenge-wespeak
    npm install
+   ```
+
+2. Configurar el archivo `.env` en la raíz con las credenciales correspondientes:
+   ```env
+   DATABASE_URL=postgresql://...
+   
+   # QStash (para entorno local usamos el emulador integrado)
+   QSTASH_DEV=true
+   APP_URL=http://127.0.0.1:3000
+
+   # Tiempo de reseteo (opcional, default: 20m. Ej: "20m", "30s", "1h")
+   NEXT_PUBLIC_RESET_TIME=20m
+   ```
+
+3. En el **SQL Editor** de Supabase, ejecutar el esquema de [`supabase/schema.sql`](supabase/schema.sql) para crear la tabla `counter` con `last_message_id`.
+
+4. Generar el cliente de Prisma:
+   ```bash
    npx prisma generate
    ```
 
-5. Correr la aplicación:
+5. En una terminal, iniciar el emulador local de QStash:
+   ```bash
+   npx @upstash/qstash-cli@latest dev
+   ```
 
+6. En otra terminal, correr la aplicación:
    ```bash
    npm run dev
    ```
 
 Abrir [http://localhost:3000](http://localhost:3000).
 
+---
+
 ## Cómo lo resolví
 
-### Lógica del contador
+### 1. Lógica del contador
+- Tabla `counter` en Supabase con una única fila (`id = 1`) que persiste `value`, `updated_at` y `last_message_id`.
+- `increment` y `decrement` son **Server Actions** (`src/lib/actions.ts`): actualizan la base de datos de manera inmediata y atómica.
+- El valor es global y persistente entre sesiones.
 
-- Tabla `counter` con una única fila (`id = 1`) que guarda `value` y `updated_at` (momento del último cambio).
-- `increment`/`decrement` son **Server Actions**: leen el valor actual, lo modifican en DB y guardan el cambio **inmediatamente** (transacción), actualizando `updated_at`.
-- El valor es **global**: una sola fila para todos los usuarios.
+### 2. Reseteo a los 20 minutos: Arquitectura orientada a eventos con QStash
+En lugar de un cron tradicional que consulta la base de datos cada minuto consumiendo recursos innecesarios y generando desfasajes de tiempo:
+- Se implementó el patrón **"Eliminar y Crear" (Cancel & Reschedule)** con **Upstash QStash**.
+- Cada vez que el usuario clickea en `+` o `−`, la Server Action cancela el job anterior en QStash (usando el `last_message_id` almacenado) y programa uno nuevo exactamente a 20 minutos.
+- Si pasan 20 minutos sin nuevos clics, QStash despacha un webhook vía `POST` a `/api/reset-counter`.
+- El endpoint valida la firma criptográfica con `verifySignatureAppRouter` para garantizar seguridad y reinicia el valor a `0`.
 
-### Reset a los 20 minutos
+### 3. Experiencia de Usuario (UX)
+- **Carga inicial**: Se implementó `src/app/loading.tsx` con un esqueleto (skeleton) animado con Tailwind mientras el servidor resuelve la consulta inicial a Supabase.
+- **Feedback interactivo**: Mientras se ejecuta la Server Action, se muestra el estado *"Guardando…"*.
+- **Transición a cero**: Cuando el temporizador llega a `00:00`, se activa un estado de sincronización (`isResetting`), se atenúa el contador, se muestra *"Reiniciando contador a 0…"* y se **deshabilitan los botones** para prevenir condiciones de carrera hasta que la base de datos confirme el reseteo.
 
-Hay dos capas para el reset:
+---
 
-1. **Cron en Supabase (`pg_cron`)**: cada minuto pone el valor en 0 si `now() - updated_at >= 20 minutes`. Corre en la base, por lo que funciona aunque la app esté apagada.
-2. **"Lazy reset" en la app (red de seguridad)**: al leer el valor, si ya pasaron 20 minutos, se devuelve (y persiste) 0. Cubre el caso de que el cron falle o no se haya configurado.
-
-### Cron: ¿Vercel o Supabase? → **Supabase (pg_cron)**
-
-- El cron escribe la base; correrlo **dentro de la misma base** elimina un salto de red y una dependencia, y **garantiza el reset aunque Vercel no reciba tráfico** (los cron de Vercel dependen de que el proyecto esté activo y del plan).
-- `pg_cron` está disponible en el **plan free** de Supabase, sin costo ni configuración extra; un cron de Vercel suma una invocación serverless adicional por corrida.
-- La lógica de negocio (respetar los 20 minutos) queda junto a los datos, en el mismo lugar.
-
-### UX
-
-- **Reminder de tiempo restante**: muestra cuánto falta para que el contador se reinicie (mm:ss) con una barra de progreso.
-- **Estados de carga**: al tocar un botón se muestra "Guardando…" y los botones se deshabilitan hasta confirmar la escritura en DB; los errores se muestran en pantalla.
-- La página es un **Server Component** (lee de DB en el server); solo el widget del contador es Client Component (necesario para el countdown y el estado de los botones).
-
-## Estructura
+## Estructura del Proyecto
 
 ```
-prisma/schema.prisma      Modelo de datos (Counter)
-supabase/schema.sql       DDL + pg_cron (copiar y pegar en SQL Editor)
-src/lib/prisma.ts         Cliente Prisma (driver adapter pg)
-src/lib/actions.ts        Server Actions: getCounter, increment, decrement
-src/components/Counter.tsx  UI del contador + countdown (Client Component) - el único client component porque requiere interacción del usuario.
-src/app/page.tsx          Landing (Server Component)
+prisma/schema.prisma              Modelo de datos (Counter con lastMessageId)
+supabase/schema.sql               DDL para inicializar la tabla en Supabase
+src/app/page.tsx                  Página principal (Server Component)
+src/app/loading.tsx               Skeleton de carga inicial (React Suspense)
+src/app/api/reset-counter/route.ts Webhook protegido de QStash para el reseteo
+src/components/Counter.tsx        Widget interactivo del contador (Client Component)
+src/lib/actions.ts                Server Actions (getCounter, increment, decrement)
+src/lib/qstash.ts                 Cliente y helper de reprogramación de jobs en QStash
+src/lib/prisma.ts                 Instancia singleton de Prisma con adapter pg
 ```
 
-## Deploy
+---
 
-Deploy estándar en Vercel con una variable de entorno `DATABASE_URL`. En Supabase conviene chequear que IP allow-list (si está activa) contenga los egress de Vercel o usar la connection string del pooler.
+## Deploy en Vercel
+
+1. Subir el código a GitHub.
+2. Importar el proyecto en [Vercel](https://vercel.com).
+3. Configurar las siguientes **Environment Variables** en Vercel:
+   - `DATABASE_URL`: Connection string de Supabase (modo pooler recomendado).
+   - `QSTASH_TOKEN`: Token obtenido en [console.upstash.com](https://console.upstash.com/) (pestaña QStash).
+   - `QSTASH_CURRENT_SIGNING_KEY`: Clave de firma actual de QStash.
+   - `QSTASH_NEXT_SIGNING_KEY`: Siguiente clave de firma de QStash.
+   - `NEXT_PUBLIC_RESET_TIME`: (Opcional) Tiempo de reseteo, por defecto `20m`.
+4. Realizar el deploy. Vercel ejecutará automáticamente `prisma generate && next build`.

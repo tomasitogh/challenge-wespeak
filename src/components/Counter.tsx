@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { increment, decrement, getCounter } from "@/lib/actions";
-
-const RESET_MS = 30 * 1000; // Para pruebas usamos 30 segundos (en prod: 20 * 60 * 1000)
+import { RESET_MS } from "@/lib/constants";
 
 function formatTime(ms: number) {
   const total = Math.max(0, Math.ceil(ms / 1000));

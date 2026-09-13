@@ -6,12 +6,12 @@ export const qstash = new Client({
 });
 
 
-const APP_URL = process.env.APP_URL || "http://127.0.0.1:3000";
+import { RESET_MS } from "@/lib/constants";
 
-
-// Para entorno de pruebas usamos una variable de 1 minuto
-const delay = "30s"
-// const delay = "20m"
+const APP_URL =
+  process.env.APP_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined) ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://127.0.0.1:3000");
 
 
 /**
@@ -33,10 +33,12 @@ export async function rescheduleResetJob(previousMessageId?: string | null): Pro
     const res = await qstash.publishJSON({
       url: `${APP_URL}/api/reset-counter`,
       body: { action: "reset" },
-      delay: delay,
+      delay: Math.floor(RESET_MS / 1000),
     });
-    console.log(`[QStash] Nuevo mensaje agendado con ID: ${res.messageId}`);
-    return res.messageId;
+
+    const messageId = "messageId" in res ? res.messageId : null;
+    console.log(`[QStash] Nuevo mensaje agendado con ID: ${messageId}`);
+    return messageId;
   } catch (error) {
     console.error("[QStash] Error al agendar mensaje en QStash:", error);
     return null;
