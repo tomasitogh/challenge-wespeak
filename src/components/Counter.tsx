@@ -34,34 +34,19 @@ export default function Counter({
     RESET_MS - (now - new Date(state.updatedAt).getTime())
   );
   
-  const displayValue = state.value;
+  // Si el tiempo llegó a 0, el contador expiró y pasa inmediatamente a 0
+  const isExpired = remaining === 0 && state.value !== 0;
+  const displayValue = isExpired ? 0 : state.value;
 
-  // Cuando el tiempo llega a 0, consulta al servidor para sincronizar sin bloquear la UI
+  // Sincroniza con el servidor cuando el tiempo llega a 0 para persistir el 0 en BD
   useEffect(() => {
-    if (remaining === 0 && state.value !== 0) {
-      let attempts = 0;
-      const maxAttempts = 5;
-
-      const interval = setInterval(async () => {
-        attempts++;
-        try {
-          const fresh = await getCounter();
-          if (fresh.value === 0) {
-            setState({ value: 0, updatedAt: fresh.updatedAt });
-            clearInterval(interval);
-          } else if (attempts >= maxAttempts) {
-            clearInterval(interval);
-          }
-        } catch {
-          if (attempts >= maxAttempts) clearInterval(interval);
-        }
-      }, 2000);
-
-      return () => clearInterval(interval);
+    if (isExpired) {
+      setState((prev) => ({ ...prev, value: 0 }));
+      getCounter().catch(() => {});
     }
-  }, [remaining, state.value]);
+  }, [isExpired]);
 
-  const handleUpdate = (action: typeof increment) => {
+  const handleUpdate = (action: typeof increment | typeof decrement) => {
     startTransition(async () => {
       const next = await action();
       setState(next);
@@ -106,7 +91,7 @@ export default function Counter({
         <p className="mt-4 text-xs text-zinc-400">Guardando…</p>
       )}
 
-      {!isPending && state.value !== 0 && (
+      {!isPending && displayValue !== 0 && (
         <p className="mt-4 text-xs text-zinc-400">
           Se reinicia en{" "}
           <span className="font-semibold tabular-nums text-zinc-600">
@@ -115,7 +100,7 @@ export default function Counter({
         </p>
       )}
 
-      {!isPending && state.value === 0 && (
+      {!isPending && displayValue === 0 && (
         <p className="mt-4 text-xs text-zinc-400">
           Inactivo (el contador está en 0)
         </p>
