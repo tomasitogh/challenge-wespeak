@@ -8,11 +8,7 @@ export const qstash = new Client({
 
 import { RESET_MS } from "@/lib/constants";
 
-const APP_URL =
-  process.env.APP_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined) ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://127.0.0.1:3000");
-
+const APP_URL = process.env.APP_URL || "http://127.0.0.1:3000";
 
 /**
  * Cancela el mensaje pendiente anterior (si existe) y programa uno nuevo a 20m.

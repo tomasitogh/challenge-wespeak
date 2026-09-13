@@ -122,12 +122,18 @@ export default function Counter({
         </p>
       )}
 
-      {!isPending && !isResetting && (
+      {!isPending && !isResetting && state.value !== 0 && (
         <p className="mt-4 text-xs text-zinc-400">
           Se reinicia en{" "}
           <span className="font-semibold tabular-nums text-zinc-600">
             {formatTime(remaining)}
           </span>
+        </p>
+      )}
+
+      {!isPending && !isResetting && state.value === 0 && (
+        <p className="mt-4 text-xs text-zinc-400">
+          Inactivo (el contador está en 0)
         </p>
       )}
     </div>
