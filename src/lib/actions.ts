@@ -29,14 +29,12 @@ export async function getCounter() {
     return {
       value: 0,
       updatedAt: updated.updatedAt.toISOString(),
-      serverNow: Date.now(),
     };
   }
 
   return {
     value: counter.value,
     updatedAt: counter.updatedAt.toISOString(),
-    serverNow: Date.now(),
   };
 }
 
@@ -52,21 +50,20 @@ export async function increment() {
 
   // Cancela el anterior y agenda el nuevo
   const newMessageId = await rescheduleResetJob(current?.lastMessageId);
-  const counter = await db.counter.upsert({
+  await db.counter.upsert({
     where: { id: 1 },
-    update: { 
-      value: baseValue + 1, 
+    update: {
+      value: baseValue + 1,
       updatedAt: new Date(),
       lastMessageId: newMessageId,
     },
-    create: { 
-      id: 1, 
+    create: {
+      id: 1,
       value: 1,
       lastMessageId: newMessageId,
     },
   });
   revalidatePath("/");
-  return { value: counter.value, updatedAt: counter.updatedAt.toISOString() };
 }
 
 export async function decrement() {
@@ -81,19 +78,18 @@ export async function decrement() {
 
   // Cancela el anterior y agenda el nuevo
   const newMessageId = await rescheduleResetJob(current?.lastMessageId);
-  const counter = await db.counter.upsert({
+  await db.counter.upsert({
     where: { id: 1 },
-    update: { 
-      value: baseValue - 1, 
+    update: {
+      value: baseValue - 1,
       updatedAt: new Date(),
       lastMessageId: newMessageId,
     },
-    create: { 
-      id: 1, 
+    create: {
+      id: 1,
       value: -1,
       lastMessageId: newMessageId,
     },
   });
   revalidatePath("/");
-  return { value: counter.value, updatedAt: counter.updatedAt.toISOString() };
 }
