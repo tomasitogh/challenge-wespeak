@@ -29,12 +29,14 @@ export async function getCounter() {
     return {
       value: 0,
       updatedAt: updated.updatedAt.toISOString(),
+      serverNow: Date.now(),
     };
   }
 
   return {
     value: counter.value,
     updatedAt: counter.updatedAt.toISOString(),
+    serverNow: Date.now(),
   };
 }
 

@@ -54,7 +54,7 @@ La documentación de Upstash fue clave para entender bien la configuración e in
 
 Antes de mandarme a desarrollar el front, siempre me gusta prototipar y ver gráficamente cómo se ve la solución. Para este caso tan simple, sumé una funcionalidad extra que aporta un plus visual: un indicador de la **última actualización** del contador con la **hora del servidor**.
 
-La interfaz respeta al máximo el requisito de usar **mayormente server components**: `Counter.tsx` es un Server Component que trae el valor desde la base de datos y renderiza la hora del servidor; el **único** client component es el par de botones (`CounterButtons`), que comparte un único estado de ejecución para bloquear `+` y `−` mientras una acción está guardando. No hay timers ni lógica de estado en el cliente: el valor siempre se lee de la base de datos. `page.tsx` sólo se encarga de montar `<Counter />`.
+La interfaz respeta al máximo el requisito de usar **mayormente server components**: `Counter.tsx` es un Server Component que trae el valor desde la base de datos y renderiza la hora del servidor; el **único** client component es `CounterControls`, que envuelve los dos botones (`+` y `−`) y el contador regresivo, comparte un único estado para bloquearlos mientras una acción está guardando, y al llegar a `0` obliga a leer el valor actual de la base de datos. **El valor nunca se calcula en el cliente**: siempre se lee de la DB. `page.tsx` sólo se encarga de montar `<Counter />`.
 
 Además, mantuve **Tailwind CSS**, ya que viene integrado en la inicialización de Next.js y permite maquetar de forma ágil, prolija y responsiva.
 
@@ -128,7 +128,8 @@ En lugar de un cron tradicional que consulta la base de datos cada minuto consum
 ### 3. Experiencia de Usuario (UX)
 
 - **Carga inicial**: Se implementó `src/app/loading.tsx` con un esqueleto (_skeleton_) animado con Tailwind mientras el servidor resuelve la consulta inicial a Supabase.
-- **Server-first y mínimo JavaScript en el cliente**: el valor del contador y la fecha de última actualización (hora del servidor) se renderizan en el servidor. El único client component es el par de botones +/−.
+- **Server-first y mínimo JavaScript en el cliente**: el valor del contador y la fecha de última actualización (hora del servidor) se renderizan en el servidor. El único client component es `CounterControls` (botones + contador regresivo).
+- **Valor siempre actualizado**: cuando el contador regresivo llega a `0` (los 20 minutos de inactividad), `CounterControls` bloquea los botones, muestra _"Actualizando…"_ y dispara un `router.refresh()`. Eso obliga al Server Component a volver a leer el valor de la base de datos, garantizando que lo que se ve en pantalla nunca quede desactualizado.
 - **Feedback interactivo**: mientras se ejecuta la Server Action, ambos botones se deshabilitan (no se pueden encadenar clics de `+` y `−` a la vez) y se muestra el estado _"Guardando…"_. Al terminar, la página se re-renderiza desde el servidor con el valor persistido en la base de datos.
 
 ---
@@ -142,7 +143,7 @@ src/app/page.tsx                     Route entry (sólo monta <Counter />)
 src/app/loading.tsx                  Skeleton de carga inicial (React Suspense)
 src/app/api/reset-counter/route.ts   Webhook protegido de QStash para el reseteo
 src/components/Counter.tsx           Contenedor del contador (Server Component: valor + última actualización)
-src/components/CounterButtons.tsx    Par de botones +/− (único Client Component, estado compartido)
+src/components/CounterControls.tsx   Botones +/− y contador regresivo (único Client Component)
 src/lib/actions.ts                   Server Actions (getCounter, increment, decrement)
 src/lib/qstash.ts                 Cliente y helper de reprogramación de jobs en QStash
 src/lib/prisma.ts                 Instancia singleton de Prisma con adapter pg

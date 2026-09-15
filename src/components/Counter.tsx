@@ -1,22 +1,8 @@
-import CounterButtons from "@/components/CounterButtons";
+import CounterControls from "@/components/CounterControls";
 import { getCounter } from "@/lib/actions";
 
-const serverDateFormatter = new Intl.DateTimeFormat("es-AR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-});
-
-function formatServerTime(iso: string) {
-  return serverDateFormatter.format(new Date(iso));
-}
-
 export default async function Counter() {
-  const { value, updatedAt } = await getCounter();
+  const { value, updatedAt, serverNow } = await getCounter();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
@@ -29,15 +15,11 @@ export default async function Counter() {
           {value}
         </p>
 
-        <CounterButtons />
-
-        <p className="mt-4 text-xs text-zinc-400">
-          Última actualización:{" "}
-          <span className="font-semibold tabular-nums text-zinc-600">
-            {formatServerTime(updatedAt)}
-          </span>{" "}
-          (hora del servidor)
-        </p>
+        <CounterControls
+          isActive={value !== 0}
+          updatedAt={updatedAt}
+          serverNow={serverNow}
+        />
       </div>
     </main>
   );
